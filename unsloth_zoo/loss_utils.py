@@ -21,7 +21,11 @@ import math
 import functools
 from typing import Optional
 torch_nn_functional_cross_entropy = torch.nn.functional.cross_entropy
-from triton import __version__ as triton_version
+from .device_type import IS_MAXWELL_GPU
+if not IS_MAXWELL_GPU:
+    from triton import __version__ as triton_version
+else:
+    triton_version = "0.0.0"  # M40: triton not available
 from . import DEVICE_TYPE
 from .temporary_patches.common import UNSLOTH_ENABLE_LOGGING, torch_compile_options, logger
 import inspect
@@ -122,9 +126,9 @@ def patch_loss_functions(_fast_cross_entropy_loss, torch_compile = True):
         return loss
     pass
 
-    if (Version(torch.__version__) < Version("2.4.0")):
+    if IS_MAXWELL_GPU or (Version(torch.__version__) < Version("2.4.0")):
         UnslothForCausalLMLoss = torch._disable_dynamo(UnslothForCausalLMLoss)
-    
+
     elif torch_compile:
         UnslothForCausalLMLoss = torch.compile(
             UnslothForCausalLMLoss,

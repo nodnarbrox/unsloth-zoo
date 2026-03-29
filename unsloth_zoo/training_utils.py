@@ -26,6 +26,7 @@ import time
 from typing import Any, Optional, List, Dict, Tuple
 from .utils import _get_dtype, Version
 from .hf_utils import dtype_from_config
+from .device_type import IS_MAXWELL_GPU
 from .gradient_checkpointing import (
     unpatch_unsloth_gradient_checkpointing,
     unpatch_unsloth_smart_gradient_checkpointing,
@@ -113,9 +114,18 @@ def prepare_model_for_training(
     assert(type(train_lm_head) is bool)
     assert(type(float32_mixed_precision) is bool)
 
+    from .device_type import IS_MAXWELL_GPU
     dtype = _get_dtype(dtype_from_config(model.config))
     mixed_precision_dtype = torch.float32
-    if dtype == torch.float16:
+
+    # M40 / Maxwell: force everything to float32 (no bfloat16 support)
+    if IS_MAXWELL_GPU:
+        mixed_precision_dtype = torch.float32
+        os.environ["UNSLOTH_MIXED_PRECISION"] = "float32"
+        if full_finetuning:
+            model._unsloth_original_dtype = dtype
+            model.config.torch_dtype = torch.float32
+    elif dtype == torch.float16:
         # We need to upcast to float32
         mixed_precision_dtype = torch.float32
         os.environ["UNSLOTH_MIXED_PRECISION"] = "float32"
@@ -395,7 +405,15 @@ def unsloth_train(trainer):
     # Mixed precision scaling
     torch_version = torch.__version__
     config_dtype = dtype_from_config(model.config)
-    if config_dtype == torch.float16:
+    # M40 / Maxwell: no bfloat16 support, force fp16 path with GradScaler
+    if IS_MAXWELL_GPU:
+        mixed_precision = "fp16"
+        mixed_dtype = torch.float16
+        if Version(torch_version) < Version("2.4.0"):
+            float16_scaler = torch.cuda.amp.GradScaler()
+        else:
+            float16_scaler = torch.amp.GradScaler("cuda")
+    elif config_dtype == torch.float16:
         mixed_precision = "fp16"
         mixed_dtype = torch.float16
         # torch.cuda.amp.autocast is deprecated >= 2.4

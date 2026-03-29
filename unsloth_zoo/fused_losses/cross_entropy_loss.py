@@ -27,8 +27,8 @@ import functools
 import math
 import os
 from ..temporary_patches.common import UNSLOTH_ENABLE_LOGGING, torch_compile_options, logger
-from ..device_type import DEVICE_TYPE
-        
+from ..device_type import DEVICE_TYPE, IS_MAXWELL_GPU
+
 
 TARGET_GB = os.environ.get("UNSLOTH_CE_LOSS_TARGET_GB", None)
 N_CHUNKS = os.environ.get("UNSLOTH_CE_LOSS_N_CHUNKS", None)
@@ -47,8 +47,9 @@ except Exception:
     pass
 
 # Module-level flag: None = untested, True = works, False = skip compile.
+# M40 / Maxwell: always disable torch.compile for fused CE loss
 _FUSED_CE_COMPILE_SUPPORTED = None if \
-    os.environ.get("UNSLOTH_FUSED_CE_COMPILE_DISABLE", "0") != "1" else False
+    (os.environ.get("UNSLOTH_FUSED_CE_COMPILE_DISABLE", "0") != "1" and not IS_MAXWELL_GPU) else False
 
 @functools.cache
 def _get_mapping(autograd):

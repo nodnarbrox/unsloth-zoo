@@ -21,6 +21,7 @@ __all__ = [
     "ALLOW_PREQUANTIZED_MODELS",
     "ALLOW_BITSANDBYTES",
     "device_synchronize",
+    "IS_MAXWELL_GPU",
 ]
 
 import torch
@@ -244,6 +245,21 @@ def get_device_count():
 pass
 
 DEVICE_COUNT : int = get_device_count()
+
+# M40 / Maxwell compatibility mode: compute capability < 7.0
+# Triton requires sm_70+, Flash Attention requires sm_80+
+IS_MAXWELL_GPU : bool = False
+if DEVICE_TYPE == "cuda":
+    _m40_major, _m40_minor = torch.cuda.get_device_capability()
+    IS_MAXWELL_GPU = (_m40_major < 7)
+    if IS_MAXWELL_GPU:
+        import os as _os
+        _os.environ["UNSLOTH_COMPILE_DISABLE"] = "1"
+        _os.environ.setdefault("TORCH_COMPILE_DISABLE", "1")
+        print(
+            f"Unsloth [M40 compat]: Detected compute capability {_m40_major}.{_m40_minor} (< 7.0). "
+            f"Using pure PyTorch fallbacks (no Triton/Flash Attention/torch.compile)."
+        )
 
 # Check blocksize for 4bit -> 64 for CUDA, 128 for AMD
 # If AMD, we cannot load pre-quantized models for now :(

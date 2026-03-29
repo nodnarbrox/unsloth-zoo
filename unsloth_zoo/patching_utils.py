@@ -85,6 +85,11 @@ pass
 
 def patch_torch_compile(debug = False, O3 = False, ignore_errors = True):
     # All Unsloth Zoo code licensed under LGPLv3
+    from .device_type import IS_MAXWELL_GPU
+    if IS_MAXWELL_GPU:
+        print("Unsloth [M40 compat]: Skipping torch.compile patching (compute capability < 7.0).")
+        os.environ["UNSLOTH_PATCHED"] = "1"
+        return
     assert(type(debug) is bool)
     assert(type(O3)    is bool)
     import os, logging

@@ -1829,7 +1829,12 @@ def load_vllm(
 
     if DEVICE_TYPE == "cuda":
         major_version, minor_version = torch.cuda.get_device_capability()
-        if major_version < 7: raise NotImplementedError("Unsloth: Your GPU is too old!")
+        if major_version < 7:
+            from .device_type import IS_MAXWELL_GPU
+            if IS_MAXWELL_GPU:
+                print("Unsloth [M40 compat]: GPU compute capability < 7.0 — vLLM may not work. Proceeding anyway.")
+            else:
+                raise NotImplementedError("Unsloth: Your GPU is too old!")
 
         # Float8 KV cache only works for 8.0 or higher
         if float8_kv_cache and major_version < 8:

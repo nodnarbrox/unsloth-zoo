@@ -47,7 +47,11 @@ from .utils import (
     get_lock,
 )
 from .log import logger
-import triton
+from .device_type import IS_MAXWELL_GPU
+if not IS_MAXWELL_GPU:
+    import triton
+else:
+    triton = None
 import regex
 from .peft_utils import get_lora_layer_modules
 from importlib.metadata import version as importlib_version
@@ -92,7 +96,7 @@ elif DEVICE_TYPE == "xpu":
     OLD_CUDA_ARCH_VERSION = False
 pass
 
-OLD_TRITON_VERSION = Version(triton.__version__) < Version("3.0.0")
+OLD_TRITON_VERSION = Version(triton.__version__) < Version("3.0.0") if triton is not None else True
 
 # Check if Unsloth Studio is allowed
 import importlib.util
@@ -3058,6 +3062,10 @@ def unsloth_compile_transformers(
     return_logits: bool = False,
     supports_sdpa: list = None,
 ):
+    # M40 / Maxwell: skip all compilation (no Triton, no torch.compile)
+    if IS_MAXWELL_GPU:
+        return
+
     # import transformers logging module and instantiate model_type logging instance.
     from transformers import logging as transformers_logging
 
