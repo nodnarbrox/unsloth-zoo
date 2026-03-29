@@ -92,7 +92,7 @@ def patch_torch_compile(debug = False, O3 = False, ignore_errors = True):
         return
     assert(type(debug) is bool)
     assert(type(O3)    is bool)
-    import os, logging
+    import logging
 
     if debug:
         DEBUGGING = " with debugging"
